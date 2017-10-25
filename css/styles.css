@@ -1,23 +1,66 @@
-body {
-  margin: 0px;
-}
-.domain {
-  display: none;
-}
-.tick line {
-  stroke: #C0C0BB;
-}
-.tick text, .legendCells text {
-  fill: #8E8883;
-  font-size: 28pt;
-  font-family: sans-serif;
-}
-.axis-label, .legend-label {
-  fill: #635F5D;
-  font-size: 50pt;
-  font-family: sans-serif;
+.graticule {
+  fill: none;
+  stroke: #777;
+  stroke-width: .5px;
+  stroke-opacity: .5;
 }
 
+.land {
+  fill: #222;
+}
+
+.county-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: .5px;
+}
+
+.state-boundary {
+  fill: none;
+  stroke: #fff;
+}
+
+ .head {
+    font-size: 20pt;
+    font-family: 'Gill Sans MT';
+    alignment-baseline: middle;
+    fill: #000000;
+  }
+  
+ .ticks {
+  font: 10px sans-serif;
+    }
+
+  .track,
+  .track-inset,
+  .track-overlay {
+    stroke-linecap: round;
+  }
+
+  .track {
+    stroke: #000;
+    stroke-opacity: 0.3;
+    stroke-width: 10px;
+  }
+
+  .track-inset {
+    stroke: #ddd;
+    stroke-width: 8px;
+  }
+
+  .track-overlay {
+    pointer-events: stroke;
+    stroke-width: 50px;
+    stroke: transparent;
+    cursor: crosshair;
+  }
+
+  .handle {
+    fill: #fff;
+    stroke: #000;
+    stroke-opacity: 0.5;
+    stroke-width: 1.25px;
+  }
 /* Make the chart container fill the page using CSS. */
 #visualization {
   position: fixed;
