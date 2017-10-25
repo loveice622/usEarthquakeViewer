@@ -1,4 +1,4 @@
-##Introduction
+## Introduction
 
 
 This demo shows the D3 interaction with the time line slider. The x axis of the slider shows the date of data. User is able to drag the slider to change the date across the axis and the map will display the data in scatters before this date.  
