@@ -67,162 +67,365 @@
 /* 0 */
 /***/ (function(module, exports) {
 
-var width = 960,
-    height = 550;
+var mapDiv = document.getElementById("area1");   
+var chartDiv = document.getElementById("area2");
+
+var tooltipdiv = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip");  
+
+var formatTime = d3.timeFormat("%Y");   
+var parseYear  = d3.timeParse("%Y") 
+var parseTime  = d3.timeParse("%Y-%m-%d")  
   
-margin = {right: 50, left: 50}
+var svgMap = d3.select("#area1").append("svg")
+.attr("width",  mapDiv.clientWidth)
+.attr("height",  mapDiv.clientHeight)
+.style('background-color', '#222')
+//.attr("transform", "translate(" + -150 + "," + 50 + ")");
 
-var projection = d3.geoAlbers()
-    .rotate([96, 0])
-    .center([-.6, 35.7])
-    .parallels([37.5, 45.5])
-    .scale(800)
-    .translate([width / 2, height / 2])
-    .precision(.1);
+     
+const path = svgMap.append('path').attr('stroke', 'gray');
+const citiesG = svgMap.append('g');
+const projection = d3.geoOrthographic();
+const initialScale = projection.scale();
+const geoPath = d3.geoPath().projection(projection);
+let moving = false;
+const rValue = d => (d.mag-5)*100;
 
-var path = d3.geoPath()
-    .projection(projection);
+const rScale = d3.scaleSqrt().range([0, 5]);
 
-var graticule = d3.geoGraticule()
-    .extent([[-98 - 45, 38 - 45], [-98 + 45, 38 + 45]])
-    .step([5, 5]);
+var commaFormat = d3.format(',');
 
-var svg = d3.select("body").append("svg")
-    .attr("width", width)
-    .attr("height", height);
+
+var tip = d3.tip()
+.attr('class', 'd3-tip')
+.offset([-10, 0])
+.html(d => `${d.place}:${d.mag}`);
+svgMap.call(tip);
+
+    d3.queue()
+      .defer(d3.json, 'https://unpkg.com/world-atlas@1/world/110m.json')
+      .defer(d3.json, 'https://unpkg.com/world-atlas@1/world/50m.json')
+      .defer(d3.csv, 'data/earthquake.csv')
+      .await((error, world110m, world50m, eqdata) => {
+        const countries110m = topojson
+          .feature(world110m, world110m.objects.countries);
+        const countries50m = topojson
+          .feature(world50m, world50m.objects.countries);
+      
+      
+      
+      
+        rScale.domain([0, d3.max(eqdata, rValue)]);
+      
+        allData=[]
+      
+        eqdata.forEach(d => {
+             
+          d.radius = rScale(rValue(d));
+          allData.push(d)
+           //console.log(d.radius)
+        });
+      
+             
+      var filterData=allData
+      
+      function updateData(data)
+      {
+
+        console.log('update...')
+
+
+        path.attr('d', geoPath(moving ? countries110m : countries50m));
+        const k = Math.sqrt(projection.scale() / 200);
+
+          const point = {
+            type: 'Point',
+            coordinates: [0, 0]
+          };
+        
+       
+          
+          data.forEach(d => {
+                    
+            point.coordinates[0] = d.longitude;
+            point.coordinates[1] = d.latitude;
+            d.projected = geoPath(point) ? projection(point.coordinates) : null;
+                      
+          });
+          
+         
+          const circles = citiesG.selectAll('circle')
+            .data(data.filter(d => d.projected));
+          circles.enter().append('circle')
+            .merge(circles)
+              .attr('cx', d => d.projected[0])
+              .attr('cy', d => d.projected[1])
+              .attr('fill', 'Coral')
+              .attr('fill-opacity', 0.2)
+              .attr('r', d => d.radius*k)
+              .on('mouseover', tip.show)
+              .on('mouseout', tip.hide);
+         
+          circles.exit().remove();
+        
+
+      }
+         
+        updateData(filterData);
+
+        let rotate0, coords0;
+        const coords = () => projection.rotate(rotate0)
+          .invert([d3.event.x, d3.event.y]);
+
+        svgMap
+          .call(d3.drag()
+            .on('start', () => {
+              rotate0 = projection.rotate();
+              coords0 = coords();
+              moving = true;
+            })
+            .on('drag', () => {
+              const coords1 = coords();
+              projection.rotate([
+                rotate0[0] + coords1[0] - coords0[0],
+                rotate0[1] + coords1[1] - coords0[1],
+              ])
+               updateData(filterData);
+            })
+            .on('end', () => {
+              moving = false;
+              updateData(filterData);
+            })
+            // Goal: let zoom handle pinch gestures (not working correctly).
+            .filter(() => !(d3.event.touches && d3.event.touches.length === 2))
+          )
+          .call(d3.zoom()
+            .on('zoom', () => {
+              projection.scale(initialScale * d3.event.transform.k);
+               updateData(filterData);
+            })
+            .on('start', () => {
+              moving = true;
+            })
+            .on('end', () => {
+              moving = false;
+               updateData(filterData);
+            })
+          )
+        
+ 
+        
+ // XY chart and brush--------------------------------------------------------------------
+        
+        
+        var margin = {top: 25, right: 25, bottom: 25, left: 25},
+          w = chartDiv.clientWidth- margin.left - margin.right,
+          h = chartDiv.clientHeight- margin.top - margin.bottom;
+      
+      
+      
+        var grouped=getGroupedData(allData)
   
-svg.append('text')
-        .attr('class', 'head')
-        .attr('x', 230)
-        .attr('y', 20)
-        .text('USA earthquake data from year 1900');
+        //grouped.forEach(function(d){console.log(d.year,d.value7) })
+
+        var yMax = d3.max(grouped, function(d){return d.value;});
+
+         // X range to operate on
+        var extent = d3.extent(grouped, function(d){ 
+            return parseYear(d.year); 
+        });
+
+        //console.log(extent)
+
+          // scale function
+         var x = d3.scaleTime()
+            .domain(extent)
+            .range([0, w-100])
+            .clamp(true);
+
+
+         var y = d3.scaleLinear()
+          .domain([0, yMax])
+          .range([h, 0]);
+
+          var xAxis = d3.axisBottom()
+          .scale(x)
+          .ticks(d3.timeYear, 5)
+          .tickSize(5)
+          .tickFormat(function() { return null; })
+
+
+          var chartBrush = d3.brushX()
+          .extent([[0, 0], [w, h]])
+          .on("end", brushended);
+
+ //draw     
+        var svgChart = d3.select("#area2").append("svg")
+            .attr("width", w + margin.left + margin.right)
+            .attr("height", h + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top +")");
+      
+      
+       svgChart.append("g")
+      .attr("class", "brush")
+      .call(chartBrush)
+      .selectAll("rect")
+      .attr("height", h)
+      .attr("transform", "translate( 0,-1)");
   
-
-svg.append("path")
-    .datum(graticule)
-    .attr("class", "graticule")
-    .attr("d", path);
-
-d3.json("https://gist.githubusercontent.com/mbostock/4090846/raw/d534aba169207548a8a3d670c9c2cc719ff05c47/us.json", function(error, us) {
-  if (error) throw error;
-
-  svg.insert("path", ".graticule")
-      .datum(topojson.feature(us, us.objects.land))
-      .attr("class", "land")
-      .attr("d", path);
-
-
-
-  svg.insert("path", ".graticule")
-      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
-      .attr("class", "state-boundary")
-      .attr("d", path);
-});
   
-  
-var parseTime  = d3.timeParse("%Y-%m-%d")   
-var formatTime = d3.timeFormat("%Y");    
-  
-d3.csv("data/us-earthquake-from1900.csv", function(d){
+  var bar = svgChart.selectAll("#bar")
+  .data(grouped)
+  .enter().append("g")
+  .each(function(d){ 
     
-
-
+    d.year = parseYear(d.year);    
+    d.value = d.value;
+    d.value7=d.value7;
+    //console.log(d.year)
     
-   // range to operate on
-var extent = d3.extent(d, function(d){ 
-    return parseTime(d.time.split('T')[0]); 
-});
+  })	
+  
+  .attr("id", "bar")
+  .attr("transform", function(d) { return "translate(" + x(d.year) + ",0)"; })	
+  .attr("class","year")
+  .on("mouseover", function(d){
+    var textTooltip = "<strong>"+formatTime(d.year)+'</strong><br /> mag>5.5: '+d.value+'<br /> mag>6.0: ' +d.value7;
+    tooltipdiv.html(textTooltip)
+      .style("top", d3.event.pageY - 20 + "px")
+      .style("left", d3.event.pageX + 20 + "px")
+      .style("visibility", "visible");  
+    //console.log(d3.event.pageY,d3.event.pageX)
+  })
+	.on("mouseout", function(){tooltipdiv.style("visibility", "hidden"); });
+				
+  
+
+
+  bar.append("rect") //found
+    .attr("width", 3)
+    .attr("y", function(d) { return y(d.value); })
+    .attr("height", function(d) { return y(0) - y(d.value); })
+    .style("fill", "#E88D0C")
+
+  bar.append("rect") //fell
+    .attr("width", 3)
+    .attr("y", function(d) {return y(d.value7); })
+    .attr("height", function(d) { return y(0) -y(d.value7); })
+    .style("fill", "red")
    
-  // console.log(extent)
+    
+    
+  
+   svgChart.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + h + ")")
+            .call(d3.axisBottom(x)
+                .ticks(20)
+                .tickPadding(0))
+            .attr("text-anchor", null)
+       
+   function brushended() {
+          if (!d3.event.sourceEvent) return; // Only transition after input.
+          if (!d3.event.selection) return; // Ignore empty selections.
+          var d0 = d3.event.selection.map(x.invert),
+              d1 = d0.map(d3.timeYear.round);
+
+          // If empty when rounded, use floor & ceil instead.
+          if (d1[0] >= d1[1]) {
+            d1[0] = d3.timeYear.floor(d0[0]);
+            d1[1] = d3.timeYear.offset(d1[0]);
+          }
+     
+                   
+          filterData=filter(d1[0],d1[1],allData)
+          updateData(filterData)
+          d3.select(this).transition().call(d3.event.target.move, d1.map(x));
+     
+          
+        }
+
+      
+ });
+
+
+function filter(start, end, data)
+{
+  var filtered=[]
+  
+   for(i = 0; i < data.length; i ++){
+     
+     var mystring =data[i].time
+     filterYear=parseTime(mystring.split('T')[0])
+     
+      if(parseInt(formatTime(filterYear))<=parseInt(formatTime(end)) &&
+             parseInt(formatTime(filterYear))>=parseInt(formatTime(start)))
+        {
+          
+          filtered.push(data[i])
+        }
+     
+     
+   }
+  
+  return filtered
+  
+}
+
+
+function getGroupedData(data)
+{
+   var grouped=[]
    
-  formatDate = d3.timeFormat("%Y");
-    
-   // scale function
-   var x = d3.scaleTime()
-      .domain(extent)
-      .range([0, width-100])
-      .clamp(true);
-
-
-    // initial value
-    var startValue = x(new Date('2012-03-20'));
-    startingValue = new Date('2012-03-20');
-    
-
-   // var x = d3.scaleLinear()
-     //   .domain([0, 180])
-       // .range([0, width])
-        //.clamp(true);
-
-    var slider = svg.append("g")
-        .attr("class", "slider")
-        .attr("transform", "translate(" + margin.left + "," + (height-100) + ")");
-
-    slider.append("text")
-    .attr("x",0)
-    .attr("y",-20)
-    .text("Show earthquakes before selected year")
-    
-    
-    slider.append("line")
-        .attr("class", "track")
-        .attr("x1", x.range()[0])
-        .attr("x2", x.range()[1])
-      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
-        .attr("class", "track-inset")
-      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
-        .attr("class", "track-overlay")
-        .call(d3.drag()
-            .on("start.interrupt", function() { slider.interrupt(); })
-            .on("start drag", function() { updateData(x.invert(d3.event.x),d); }));
-
-    slider.insert("g", ".track-overlay")
-        .attr("class", "ticks")
-        .attr("transform", "translate(0," + 18 + ")")
-      .selectAll("text")
-      .data(x.ticks(10))
-      .enter().append("text")
-        .attr("x", x)
-        .attr("text-anchor", "middle")
-        .text(function(d) { return formatDate(d); });
-
-    var handle = slider.insert("circle", ".track-overlay")
-        .attr("class", "handle")
-        .attr("r", 10);
-
-    function updateData(h,d) 
+   var tempYear='NIL'
+   
+   var counts=0
+   
+   var counts7=0
+   
+    for(i = 0; i < data.length; i ++)
     {
-      console.log(formatDate(h))
-           
-      handle.attr("cx", x(h));
-      
-      svg.selectAll('circle[class=scatter]').remove()
-      
-      for(i = 0; i < d.length; i ++){
     
-           var mystring =d[i].time
-           filterYear=parseTime(mystring.split('T')[0])
-           //console.log(formatTime(d.time))
-           
-           //if(formatTime(filterYear)==formatTime(h))
-           if(parseInt(formatTime(filterYear))<=parseInt(formatTime(h)))
-           
-            {
+        var strYear =data[i].time.split('-')[0]
+        var mag     = parseFloat(data[i].mag)
+        
+        if(strYear==tempYear)
+         {
+             counts++
+             if(mag>6.0)
+               {
+                 counts7++
+               }
+         }
+        else
+         {
+            if(tempYear!='NIL')
+             {
+                var singleObj = {}
+                singleObj['year'] =strYear;  //+'-01-01'; //data[i].time.split('T')[0];
+                singleObj['value'] = counts; 
+                singleObj['value7'] = counts7;
+                grouped.push(singleObj)
+             }
+             
+             tempYear = strYear
+             counts=1
+             counts7 =0
+            
+         }
+                       
+     }
+   
+   
+   
+   return grouped;
+}
 
-              svg.append("circle")
-                .attr("cx", projection([d[i].longitude,d[i].latitude])[0])
-                .attr("cy", projection([d[i].longitude,d[i].latitude])[1])
-                .attr("r", (d[i].mag-5)*4)
-                .style("fill", "red")
-                .attr("class", "scatter")
 
-              }
-            }
-           
-    }
 
-    
-})
 
 
 /***/ })
