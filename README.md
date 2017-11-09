@@ -45,8 +45,11 @@ A sketch is made in early with the data only in the range of American.
 - Y axis: the numbers of the earthquakes 
 - Bar Color: represent the magnitude level of the earthquake.
 - Brush: User can use brush to select the data in specific range of the years to display
+
 ![6](https://user-images.githubusercontent.com/25095189/32584881-a56e616e-c4c8-11e7-8f78-3a0e69bb5c94.png)
+
 - Tips: shows remark of the bar when mouse hovers on the certain bar
+
 ![5](https://user-images.githubusercontent.com/25095189/32583864-981899ee-c4c3-11e7-93f9-04e7cf02b67a.png)
 
 ### Menu
