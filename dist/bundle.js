@@ -88,18 +88,50 @@ svg.append('text')
   .text('Data from USGS Earthquake Hazards Program');
 
 
+
+//menu 
+var legend=d3.select("#menu").append('svg')
+    .attr("height", 60)
+
+//legend
+legend.append("rect")
+      .attr("x", 5)
+      .attr("y", 10)
+      .attr("width", 20)
+      .attr("height", 20)
+      .style("fill",'Coral')
+
+legend.append("text")
+      .attr("x", 35)
+      .attr("y", 23)
+			.style("fill",'DimGray')
+      .text("mag<=6")
+
+legend.append("rect")
+      .attr("x", 5)
+      .attr("y", 35)
+      .attr("width", 20)
+      .attr("height", 20)
+      .style("fill",'Crimson')
+
+legend.append("text")
+      .attr("x", 35)
+      .attr("y", 48)
+			.style("fill",'DimGray')
+      .text("mag>6")
+
+  
+//control
 d3.select("#menu").append('div')
 		.attr("class","help")
 		.text("Move your mouse over the circles and bars for more information, brush the bar area to select the range of years to display ");
 
-var typeMenu = d3.select("#menu").append('div')
-			.attr("class","typeMenu");
-
-typeMenu.append("div") //menu
-		.attr("class","help")
-		.text("Animation");
 
 
+
+
+
+//map
 var tooltipdiv = d3.select("body")
 	.append("div")
 	.attr("class", "tooltip");  
@@ -125,12 +157,16 @@ var svgMap = d3.select("#area1").append("svg")
 
 
 
+var start=-1;
+var end=-1;
+var mag=-1;
+
 const initialScale = projection.scale()*1.2;
 //const geoPath = d3.geoPath().projection(projection);
 let moving = false;
 const rValue = d => (d.rms)*1000;
 
-const rScale = d3.scaleSqrt().range([0, 3]);
+const rScale = d3.scaleSqrt().range([2, 4]);
 
 var commaFormat = d3.format(',');
 
@@ -138,7 +174,7 @@ var commaFormat = d3.format(',');
       .defer(d3.json, 'data/world-countries.json')
       .defer(d3.csv, 'data/earthquake.csv')
       .await((error, world, eqdata) => {
-  
+   
       
        var firstEnter=1;
       
@@ -153,9 +189,13 @@ var commaFormat = d3.format(',');
         allData=[]
       
         eqdata.forEach(d => {
+          
+   //       if(isNaN(d.rms))
+    //         d.rms=1
              
           d.radius = rScale(rValue(d));
           
+                   
           if(Number(d.mag)>6)
              d.color="Crimson"
           else
@@ -292,17 +332,69 @@ var commaFormat = d3.format(',');
           )
         
 //manu control
-        
+
+       var typeMenu = d3.select("#menu").append('div')
+        .attr("class","typeMenu");
+
+       typeMenu.append("div") //menu
+        .attr("class","help")
+        .text("Animation");
+             
         typeMenu.append("div")
           .text("REPLAY")
           .attr("id","menuItem")
           .on("click", function(){
-          
+
           svgMap.selectAll('circle').remove()
           firstEnter=1;
           updateData(filterData)
         });
-        
+      
+      
+      var found_fellMenu = d3.select("#menu").append('div')
+      .attr("class","typeMenu");
+		
+      found_fellMenu.append("div") //menu
+        .attr("class","help")
+        .text("Magnitude Filter:");
+      
+      
+      var found_fellList = [{name:'Mag>6',id:'big'},{name:'Mag<=6',id:'small'},{name:'All',id:'all'}];
+		
+      found_fellMenu.selectAll('#menuItem')
+        .data(found_fellList)
+        .enter()
+        .append("div")
+        .attr("id","menuItem")
+        .attr("class",function(d){ if (d.id ==='all')return 'active last'; })
+        .html(function(d){return d.name;})
+        .on('click', function(d){
+        d3.selectAll('.typeMenu #menuItem').classed('active',false); 
+        switch (d.id){
+          case 'big':
+            d3.select(this).classed('active',true);
+            
+            mag=1
+            filterData=filter(start,end,mag,allData)
+            updateData(filterData)
+
+            break;
+          case 'small':
+            d3.select(this).classed('active',true);
+            mag=0
+            filterData=filter(start,end,mag,allData)
+            updateData(filterData)
+            break;
+          case 'all':
+            d3.select(this).classed('active',true); 
+            mag=-1
+            filterData=filter(start,end,mag,allData)
+            updateData(filterData)
+            break;
+        }
+      });	
+      
+
  // XY chart and brush--------------------------------------------------------------------
         
         
@@ -359,12 +451,10 @@ var commaFormat = d3.format(',');
             .attr("transform", "translate(" + margin.left + "," + margin.top +")");
       
       
-       svgChart.append("g")
+       var gbrush=svgChart.append("g")
       .attr("class", "brush")
       .call(chartBrush)
-      .selectAll("rect")
-      .attr("height", h)
-      .attr("transform", "translate( 0,-1)");
+
   
   
   var bar = svgChart.selectAll("#bar")
@@ -396,6 +486,7 @@ var commaFormat = d3.format(',');
 
 
   bar.append("rect") //found
+    .attr("class","rect")
     .attr("width", w/45)
     .attr("y", function(d) { return y(d.value); })
     .attr("height", function(d) { return y(0) - y(d.value); })
@@ -405,6 +496,7 @@ var commaFormat = d3.format(',');
   
 
   bar.append("rect") //fell
+    .attr("class","rect")
     .attr("width", w/45)
     .attr("y", function(d) {return y(d.value7); })
     .attr("height", function(d) { return y(0) -y(d.value7); })
@@ -412,29 +504,31 @@ var commaFormat = d3.format(',');
     .style("stroke", "white")
 		.style("stroke-width", 0.5)
    
+
+  var longestDelay =d3.max(allData, d=>d.delay)
   
-  svgChart.append("line")
-		.attr("x1", 0)
-		.attr("y1", 10)
-		.attr("x2", w)
-		.attr("y2", 10)
-		.attr("id","chartAxis")
-	
-	//charts.call(chartBrush);
-	
-
-
+  var timeline = svgChart.append('line')
+            .attr("x1", 0)
+            .attr("y1", 10)
+            .attr("x2", 0)
+            .attr("y2", h)
+            .style('stroke', 'white')
+            .style('stroke-width', 3)
+            .transition()
+               .ease(d3.easeLinear)
+             .duration(longestDelay + 1000)
+             .attr('x1', x(parseYear(2016)))
+   					 .attr('x2', x(parseYear(2016)))
+  					.remove()
+  
 	svgChart.append("text")
-		.text("Number of Earthquakes")
+		.text("Number of Earthquakes") 
 		.attr("x", "20px")
 		.attr("y", "20px")
 		.attr("class","label")
 		.style("fill","#FFF")
   
    
-    
-    
-  
    svgChart.append("g")
             .attr("class", "axis axis--x")
             .attr("transform", "translate(0," + h + ")")
@@ -450,12 +544,11 @@ var commaFormat = d3.format(',');
                 .ticks(5)       
                 .tickPadding(0))
             
-           
-    
        
    function brushended() {
           if (!d3.event.sourceEvent) return; // Only transition after input.
           if (!d3.event.selection) return; // Ignore empty selections.
+     svgMap.selectAll('circle').remove()
           var d0 = d3.event.selection.map(x.invert),
               d1 = d0.map(d3.timeYear.round);
 
@@ -464,37 +557,84 @@ var commaFormat = d3.format(',');
             d1[0] = d3.timeYear.floor(d0[0]);
             d1[1] = d3.timeYear.offset(d1[0]);
           }
+        
+          svgChart.selectAll('rect')
+          .classed("active", function(d) { return d0[0] <= d && d <= d0[1]; });
      
-                   
-          filterData=filter(d1[0],d1[1],allData)
+          start= d1[0]
+          end = d1[1]
+          
+          filterData=filter(d1[0],d1[1],mag, allData)
           updateData(filterData)
           d3.select(this).transition().call(d3.event.target.move, d1.map(x));
-     
-          
-        }
+     			
+     			
+   }
 
       
  });
 
 
-function filter(start, end, data)
+function filter(start, end, mag, data)
 {
+  var temp=[]
   var filtered=[]
   
-   for(i = 0; i < data.length; i ++){
-     
-     var mystring =data[i].time
-     filterYear=parseTime(mystring.split('T')[0])
-     
-      if(parseInt(formatTime(filterYear))<=parseInt(formatTime(end)) &&
-             parseInt(formatTime(filterYear))>=parseInt(formatTime(start)))
+  if(mag==-1)
+    {
+      temp=data
+    }
+  else
+    {
+      for(i = 0; i < data.length; i ++)
+       {
+         if(mag==0) //mag<6.0
+           {
+             if(Number(data[i].mag)<=6)
+             {
+               temp.push(data[i])
+             }
+
+           }
+         else
+           {
+             if(Number(data[i].mag)>6)
+             {
+               temp.push(data[i])
+             }
+             
+           }
+       }
+           
+    }
+  
+  
+  if(start=-1&&end==-1)
+    {
+      filtered=temp;
+    }
+  else
+    {
+      
+      for(i = 0; i < temp.length; i ++)
+      {
+
+        var mystring =temp[i].time
+        filterYear=parseTime(mystring.split('T')[0])
+
+        if(parseInt(formatTime(filterYear))<=parseInt(formatTime(end)) &&
+           parseInt(formatTime(filterYear))>=parseInt(formatTime(start)))
         {
-          
-          filtered.push(data[i])
+
+          filtered.push(temp[i])
         }
-     
-     
-   }
+
+
+      }
+    }
+  
+  console.log("filter",formatTime(start),formatTime(end))
+  console.log(filtered.length)
   
   return filtered
   

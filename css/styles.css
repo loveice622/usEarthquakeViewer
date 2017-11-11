@@ -37,6 +37,13 @@
     }
 
 
+.legend {
+  background-color: red;
+  height: 50;
+  width: 50;
+  border-radius: 100%;
+}
+
 
   .title {
   
@@ -117,7 +124,16 @@
 
 .typeMenu {
   clear: both; border-top-color: rgb(114, 114, 114); border-top-width: 1px; border-top-style: solid;}
-  
+
+
+.active#menuItem {
+	color: rgb(0, 196, 255);
+}
+
+rect.active {
+  stroke: #f00;
+  fill:yellow;
+}
 
 #menu {
 	background: rgb(245, 245, 245); 
@@ -130,4 +146,5 @@
   display: block; 
   position: absolute; 
   opacity: 50;
+ 
 }
