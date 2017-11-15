@@ -488,10 +488,7 @@ var commaFormat = d3.format(',');
             d1[0] = d3.timeYear.floor(d0[0]);
             d1[1] = d3.timeYear.offset(d1[0]);
           }
-        
-          svgChart.selectAll('rect')
-          .classed("active", function(d) { return d0[0] <= d && d <= d0[1]; });
-     
+            
           start= d1[0]
           end = d1[1]
           
@@ -540,7 +537,7 @@ function filter(start, end, mag, data)
     }
   
   
-  if(start=-1&&end==-1)
+  if(start==-1&&end==-1)
     {
       filtered=temp;
     }
